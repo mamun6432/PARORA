@@ -6,3 +6,37 @@ rcsb-api
 requests
 MDAnalysis
 numpy
+# Sequence-alignment matching for superposing structures with different
+# residue numbering. Optional: superpose.py falls back to numbering-based
+# matching when it is missing.
+biopython
+# PyMOL ray tracing (optional, used by pymol_render.py / pymol_worker.py).
+# NOT a pip dependency -- it runs in its own interpreter, discovered at runtime.
+# Set up with:  conda create -n pymol-render -c conda-forge pymol-open-source
+# Override the interpreter with the PYMOL_PYTHON environment variable.
+
+# Membrane embedding (optional, used by membrane.py). NOT a pip dependency --
+# PACKMOL-Memgen, PACKMOL, MEMEMBED and reduce all come from AmberTools and
+# run in their own environment, discovered at runtime:
+#     conda create -n ambertools -c conda-forge ambertools
+# Override the discovered executable with the PACKMOL_MEMGEN environment
+# variable. Orientation alone also works without it for any entry in OPM,
+# which is fetched over HTTP.
+
+# Structure preparation (prepare.py) needs nothing extra: it rewrites PDB
+# records directly, deliberately avoiding ParmEd/pdb4amber, which are broken by
+# NumPy 2 in current AmberTools builds. Adding hydrogens uses `reduce` from the
+# same AmberTools installation the membrane tools discover.
+
+# Simulation, QM and QM/MM setup (simulation.py, quantum.py, oniom.py).
+# AmberTools again, discovered the same way as for the membrane tools: tleap
+# builds the topology and antechamber/parmchk2 parameterise ligands, and both
+# are run for real. Everything else -- GROMACS run files, Rosetta job files,
+# Gaussian/ORCA/Psi4 and ONIOM inputs -- is generated, since none of those
+# programs is installed here.
+#
+# RDKit is optional but strongly recommended: it is what protonates a ligand
+# correctly, using the bond orders from the PDB chemical dictionary. Without
+# it the fallback is `reduce`, which places hydrogens from idealised geometry
+# and can leave a molecule chemically incomplete.
+rdkit
