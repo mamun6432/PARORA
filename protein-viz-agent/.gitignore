@@ -1,0 +1,14 @@
+# PyMOL ray-traced output
+renders/
+__pycache__/
+
+# Membrane builds — large packed systems and their intermediates
+membranes/
+
+# Prepared structures and generated leap scripts
+prepared/
+
+# Simulation setups: topologies, ligand parameters, run inputs
+simulations/
+Ollama.dmg
+.agents/
