@@ -2,32 +2,21 @@
 # Developer : Methun Kamruzzaman, Abdullah Al Mamun
 # Date      : 2026-09-11
 # Summary   : Streamlit-side bridge to headless PyMOL ray tracing.
-<<<<<<< Updated upstream
 #
-#             PyMOL cannot be installed into the anaconda base env without a
-#             ~106-package channel migration that would relink conda's own
-#             libarchive/libsolv and Jupyter's zeromq. Instead this module
-#             drives an already-working PyMOL interpreter (PyMOL.app's bundled
-#             conda-forge Python) as a subprocess, passing the scene as JSON.
-#
-#             Nothing here imports pymol, so it is safe to import from app.py
-#             regardless of what is installed in the Streamlit environment.
-#             Subprocess start-up (~1-2 s) is negligible against ray-trace time.
-=======
 #             PyMOL cannot be installed into the anaconda base env without a
 #             ~106-package channel migration that would relink conda's own
 #             libarchive/libsolv and Jupyter's zeromq. Instead this module
 #             drives a PyMOL-capable interpreter (a conda env holding
-#             pymol-open-source) as a subprocess, passing the scene as JSON.
->>>>>>> Stashed changes
+#             pymol-open-source, or a bundled PyMOL.app as fallback) as a
+#             subprocess, passing the scene as JSON.
+#
+#             Nothing here imports pymol, so it is safe to import from app.py
+#             regardless of what is installed in the Streamlit environment.
+#             Subprocess start-up (~1-2 s) is negligible against ray-trace time.
 # =============================================================================
 
 import json
 import os
-<<<<<<< Updated upstream
-import shutil
-=======
->>>>>>> Stashed changes
 import subprocess
 import sys
 import time
@@ -53,11 +42,6 @@ BUNDLE_INTERPRETERS = [
     "/opt/sbgrid/x86_64-linux/pymol/current/bin/python",
 ]
 
-<<<<<<< Updated upstream
-=======
-_cached_interpreter = None
-
->>>>>>> Stashed changes
 
 def _conda_candidates():
     """Interpreters from conda envs whose name mentions pymol, best first."""
@@ -72,11 +56,9 @@ def _conda_candidates():
                     found.append(exe)
     return found
 
-<<<<<<< Updated upstream
+
 _cached_interpreter = None
 
-=======
->>>>>>> Stashed changes
 
 def find_pymol_python(force_rescan: bool = False):
     """
@@ -162,11 +144,7 @@ def render_scene(
         quality        : "draft" for interactive use, "publication" for final
                          figures. Publication enables surface_quality, finer
                          cartoon sampling and ambient occlusion, which together
-<<<<<<< Updated upstream
-                         cost roughly two orders of magnitude more ray-trace
-=======
                          cost roughly an order of magnitude more ray-trace
->>>>>>> Stashed changes
                          time on a transparent surface.
         shadows        : Enable ray-traced shadows.
         ambient_occlusion: Enable ambient occlusion shading.

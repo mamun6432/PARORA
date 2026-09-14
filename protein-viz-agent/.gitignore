@@ -1,8 +1,3 @@
-<<<<<<< Updated upstream
-
-# PyMOL ray-traced output
-renders/
-=======
 # PyMOL ray-traced output
 renders/
 __pycache__/
@@ -15,6 +10,5 @@ prepared/
 
 # Simulation setups: topologies, ligand parameters, run inputs
 simulations/
->>>>>>> Stashed changes
 Ollama.dmg
 .agents/

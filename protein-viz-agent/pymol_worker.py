@@ -1,7 +1,6 @@
 # =============================================================================
 # Developer : Methun Kamruzzaman, Abdullah Al Mamun
 # Date      : 2026-09-11
-<<<<<<< Updated upstream
 # Summary   : Headless PyMOL ray-tracing worker. Runs inside a PyMOL-capable
 #             Python interpreter (NOT the Streamlit env), reads a JSON scene
 #             spec on stdin, rebuilds the NGL.js representation stack as
@@ -14,12 +13,6 @@
 #
 #             Target interpreter is Python 3.10 (PyMOL.app bundles conda-forge
 #             3.10), so avoid 3.11+ syntax in this file.
-=======
-# Summary   : This PyMOL-capable Python interpreter reads a JSON scene
-#             spec on stdin, rebuilds the NGL.js representation stack as
-#             independent PyMOL objects, ray traces, and writes a PNG.
-#
->>>>>>> Stashed changes
 # =============================================================================
 
 import json
@@ -46,17 +39,6 @@ CHAIN_PALETTE = [
 # ── NGL representation type → PyMOL show-command(s) ──────────────────────────
 # Values are lists because some NGL reps are a composite in PyMOL.
 REP_MAP = {
-<<<<<<< Updated upstream
-    "cartoon":    ["cartoon"],
-    "surface":    ["surface"],
-    "ball+stick": ["sticks", "spheres"],
-    "spacefill":  ["spheres"],
-    "line":       ["lines"],
-    "point":      ["nonbonded"],
-    "ribbon":     ["ribbon"],
-    "backbone":   ["sticks"],
-    "tube":       ["cartoon"],
-=======
     "cartoon":     ["cartoon"],
     "surface":     ["surface"],
     "ball+stick":  ["sticks", "spheres"],
@@ -82,7 +64,6 @@ REP_MAP = {
 # NGL cartoon variants that map onto a PyMOL cartoon sub-style.
 CARTOON_STYLE = {
     "tube": "tube", "rope": "tube", "rocket": "automatic", "cartoon": None,
->>>>>>> Stashed changes
 }
 
 # Per-rep transparency is a different setting name for every PyMOL rep type.
@@ -152,8 +133,6 @@ def ngl_to_pymol_selection(ngl):
     if s.startswith(":") and len(s) > 1:
         return "chain " + s[1:]
 
-<<<<<<< Updated upstream
-=======
     # Residue numbers and ranges, optionally chain-qualified, as produced by
     # the sequence browser: "74-80:A", "95:A", "74-80", or several joined by
     # "or". PyMOL spells these "resi 74-80 and chain A".
@@ -175,7 +154,6 @@ def ngl_to_pymol_selection(ngl):
     if converted:
         return " or ".join(converted)
 
->>>>>>> Stashed changes
     # "_C" → element C
     if s.startswith("_") and len(s) > 1:
         return "elem " + s[1:]
@@ -220,11 +198,7 @@ def apply_color(cmd, obj, color, warnings):
             cmd.color(col, "%s and elem %s" % (obj, elem))
         return
 
-<<<<<<< Updated upstream
-    if c == "spectrum":
-=======
     if c in ("spectrum", "residueindex"):
->>>>>>> Stashed changes
         # Prefer per-residue banding on CA; fall back to all atoms for ligands.
         if cmd.count_atoms("%s and name CA" % obj) > 1:
             cmd.spectrum("count", "rainbow", "%s and name CA" % obj)
@@ -247,8 +221,6 @@ def apply_color(cmd, obj, color, warnings):
         cmd.spectrum("b", "blue_white_red", obj)
         return
 
-<<<<<<< Updated upstream
-=======
     if c == "sstruc":
         # Match NGL's secondary-structure palette closely enough to be readable.
         cmd.color("grey70", obj)
@@ -273,7 +245,6 @@ def apply_color(cmd, obj, color, warnings):
         cmd.spectrum("count", "rainbow", "%s and name CA" % obj)
         return
 
->>>>>>> Stashed changes
     if is_valid_color(cmd, c):
         cmd.color(c, obj)
         return
@@ -365,14 +336,11 @@ def build_and_render(spec):
             cmd.hide("everything", obj)
 
             shows = REP_MAP.get(rep_type, ["cartoon"])
-<<<<<<< Updated upstream
-=======
             if not shows:
                 warnings.append("Rep %d: '%s' has no PyMOL equivalent - skipped."
                                 % (i, rep_type))
                 cmd.delete(obj)
                 continue
->>>>>>> Stashed changes
             if rep_type == "backbone":
                 cmd.show("sticks", "%s and name N+CA+C+O" % obj)
             else:
@@ -381,14 +349,9 @@ def build_and_render(spec):
 
             if rep_type == "ball+stick":
                 cmd.set("sphere_scale", 0.25, obj)
-<<<<<<< Updated upstream
-            if rep_type == "tube":
-                cmd.cartoon("tube", obj)
-=======
             style = CARTOON_STYLE.get(rep_type)
             if style:
                 cmd.cartoon(style, obj)
->>>>>>> Stashed changes
             if rep_type == "cartoon":
                 # Cartoon needs a trace for CA-only or nucleic models.
                 cmd.set("cartoon_trace_atoms", 0, obj)
