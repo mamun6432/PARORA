@@ -1,5 +1,6 @@
 """
 analysis_tools.py
+Developer : Broderick Bellard
 
 Notebook-derived deterministic protein structure analysis tools
 for PARORA.
