@@ -1,6 +1,7 @@
 fastapi
 uvicorn[standard]
 streamlit
+watchdog   # lets Streamlit use OS file-change events instead of polling for --server.runOnSave
 ollama
 rcsb-api
 requests
