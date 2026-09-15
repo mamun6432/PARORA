@@ -1,0 +1,19 @@
+# Conda environment for running PARORA (protein-viz-agent/app.py) locally,
+# outside Docker -- the path that actually reaches every tool, including the
+# AmberTools-backed ones Docker doesn't bundle.
+#
+# Python packages are deliberately NOT pinned here -- protein-viz-agent/
+# requirements.txt is the single source of truth for those, installed by
+# run.sh with pip after this environment exists, so there is only one place
+# to update when a dependency changes.
+#
+# Usage:
+#   conda env create -f parora.yml
+#   conda env update -f parora.yml --prune   # to pick up a python-version bump later
+name: parora
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12
+  - pip
