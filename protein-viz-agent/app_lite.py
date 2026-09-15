@@ -15,9 +15,14 @@ import re
 import streamlit as st
 import os
 import json
+import logging
 from pathlib import Path
 from ollama import Client
 from rcsbapi.search import TextQuery
+
+from parora_logging import setup_logging
+
+log = setup_logging("app_lite")
 
 # ── Asset resolution: works in both Docker (/app/logo/) and local dev (../logo/)
 _HERE = Path(__file__).parent
@@ -74,6 +79,16 @@ for k, v in defaults.items():
         st.session_state[k] = v
 
 model = "llama3.2:latest"
+
+
+@st.cache_resource(show_spinner=False)
+def _log_startup_once() -> bool:
+    """Log once per process -- see app.py's identical helper for why cache_resource."""
+    log.info("PARORA app_lite.py starting -- model=%s ollama_host=%s", model, OLLAMA_HOST)
+    return True
+
+
+_log_startup_once()
 
 
 # ====================== AGENT TOOLS ======================
@@ -225,8 +240,15 @@ tools = [
 
 # ====================== AGENT ======================
 
+def _log(msg: str, level: int = logging.INFO) -> None:
+    """Record one agent-loop event to both the in-session debug panel and the
+    persistent log file -- see app.py's identical helper for the rationale."""
+    st.session_state.debug_logs.append(msg)
+    log.log(level, msg)
+
+
 def run_agent(prompt: str) -> str:
-    st.session_state.debug_logs.append(f"📨 User: {prompt}")
+    _log(f"📨 User: {prompt}")
 
     messages = [
         {
@@ -250,12 +272,21 @@ def run_agent(prompt: str) -> str:
         {"role": "user", "content": prompt}
     ]
 
-    response = ollama_client.chat(
-        model=model,
-        messages=messages,
-        tools=tools,
-        options={"temperature": 0.0}
-    )
+    try:
+        response = ollama_client.chat(
+            model=model,
+            messages=messages,
+            tools=tools,
+            options={"temperature": 0.0}
+        )
+    except ConnectionError:
+        err = f"Cannot reach Ollama at {OLLAMA_HOST}. Start Ollama with `ollama serve`."
+        _log(f"❌ {err}", logging.ERROR)
+        return err
+    except Exception as e:
+        _log(f"❌ Ollama error: {e}", logging.ERROR)
+        log.exception("Unhandled error calling Ollama")
+        return f"Ollama error: {e}"
 
     tool_calls = response.get("message", {}).get("tool_calls", [])
     summary_parts = []
@@ -294,11 +325,11 @@ def run_agent(prompt: str) -> str:
             result = f"Unknown tool: {name}"
             summary_parts.append(result)
 
-        st.session_state.debug_logs.append(f"🔧 {name}({args}) → {result}")
+        _log(f"🔧 {name}({args}) → {result}")
 
     final_text = response.get("message", {}).get("content", "").strip()
     reply = final_text or ("Done: " + "; ".join(summary_parts)) if summary_parts else "No action taken."
-    st.session_state.debug_logs.append(f"💬 Agent: {reply}")
+    _log(f"💬 Agent: {reply}")
     return reply
 
 

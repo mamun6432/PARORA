@@ -15,6 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # discovered at runtime (PYMOL_PYTHON / PACKMOL_MEMGEN / AMBERHOME), which
 # this image does not bundle. Everything else works out of the box.
 COPY protein-viz-agent/app.py .
+COPY protein-viz-agent/parora_logging.py .
 COPY protein-viz-agent/analysis_tools.py .
 COPY protein-viz-agent/sequence_utils.py .
 COPY protein-viz-agent/structure_report.py .
@@ -31,7 +32,7 @@ COPY protein-viz-agent/pymol_render.py .
 COPY protein-viz-agent/pymol_worker.py .
 COPY protein-viz-agent/viewer_component/ ./viewer_component/
 COPY logo/ ./logo/
-RUN mkdir -p /app/structures /app/membranes /app/prepared
+RUN mkdir -p /app/structures /app/membranes /app/prepared /app/logs
 
 EXPOSE 8501
 

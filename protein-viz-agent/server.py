@@ -25,6 +25,10 @@ from fastapi.templating import Jinja2Templates
 from ollama import Client
 from rcsbapi.search import TextQuery
 
+from parora_logging import setup_logging
+
+log = setup_logging("server")
+
 _HERE = Path(__file__).parent
 _LOGO_DIR = _HERE / "logo"
 if not _LOGO_DIR.exists():
@@ -38,6 +42,8 @@ templates = Jinja2Templates(directory=str(_HERE / "templates"))
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 ollama_client = Client(host=OLLAMA_HOST)
 MODEL = "qwen2.5:7b"
+
+log.info("PARORA server.py starting -- model=%s ollama_host=%s", MODEL, OLLAMA_HOST)
 
 # Single in-memory session (swap for Redis + session cookie for multi-user)
 _session: dict = {"pdb_id": None, "representations": []}
@@ -296,9 +302,20 @@ def run_agent_stream(prompt: str):
         {"role": "user", "content": prompt},
     ]
 
-    response = ollama_client.chat(
-        model=MODEL, messages=messages, tools=TOOLS, options={"temperature": 0.0}
-    )
+    log.info("Chat request: %r", prompt)
+    try:
+        response = ollama_client.chat(
+            model=MODEL, messages=messages, tools=TOOLS, options={"temperature": 0.0}
+        )
+    except ConnectionError:
+        err = f"Cannot reach Ollama at {OLLAMA_HOST}. Start Ollama with `ollama serve`."
+        log.error(err)
+        yield f"data: {json.dumps({'evt': 'reply', 'text': err})}\n\n"
+        return
+    except Exception as e:
+        log.exception("Ollama call failed")
+        yield f"data: {json.dumps({'evt': 'reply', 'text': f'Ollama error: {e}'})}\n\n"
+        return
 
     # Parse all tool calls, then deduplicate before executing any
     parsed: list[dict] = []
@@ -361,10 +378,12 @@ def run_agent_stream(prompt: str):
             )
 
         if action:
+            log.info("Tool '%s' args=%s -> %s", name, args, action)
             yield f"data: {json.dumps({'evt': 'action', **action})}\n\n"
 
     text = response.get("message", {}).get("content", "").strip()
     reply = text or ("Done: " + "; ".join(summary)) or "No action taken."
+    log.info("Reply: %r", reply)
     yield f"data: {json.dumps({'evt': 'reply', 'text': reply})}\n\n"
 
 

@@ -29,6 +29,7 @@
 import streamlit as st
 import os
 import json
+import logging
 import re
 import time
 import uuid
@@ -116,6 +117,10 @@ import membrane as mem
 # it answers "which file do I want" before anything is loaded.
 import Protein_accession as pacc
 
+from parora_logging import setup_logging
+
+log = setup_logging("app")
+
 st.set_page_config(page_title="Molecular Agent", layout="wide")
 st.title("Molecular Agent")
 st.caption("Natural language → Tool-calling agent → Analyze and visualize molecular structures")
@@ -138,6 +143,31 @@ OLLAMA_OPTIONS = {"temperature": 0.0, "num_ctx": NUM_CTX}
 # Hold the model in memory between messages, so a pause in the conversation
 # does not cost a reload from disk on the next one.
 KEEP_ALIVE = os.environ.get("PARORA_KEEP_ALIVE", "30m")
+
+
+@st.cache_resource(show_spinner=False)
+def _log_startup_once() -> bool:
+    """
+    Log one summary of what's actually available in this environment.
+
+    Runs exactly once per process -- st.cache_resource, not a plain module
+    global, because Streamlit re-executes this whole script on every chat
+    message, and a plain global would be reset (and this would re-log) on
+    every single turn.
+    """
+    log.info("PARORA app.py starting -- model=%s ollama_host=%s", MODEL, OLLAMA_HOST)
+    log.info("MDAnalysis available: %s", MDA_AVAILABLE)
+    log.info("PyMOL available: %s (PYMOL_PYTHON=%s)",
+             PYMOL_AVAILABLE, os.getenv("PYMOL_PYTHON", "<not set>"))
+    amber = mem.find_backend()
+    if amber["ready"]:
+        log.info("AmberTools backend ready: amberhome=%s", amber["amberhome"])
+    else:
+        log.warning("AmberTools backend not ready: %s", amber["detail"] or "not found")
+    return True
+
+
+_log_startup_once()
 
 # ── Storage ───────────────────────────────────────────────────────────────────
 # PDB files downloaded during the session are cached here to avoid re-fetching
@@ -5005,6 +5035,18 @@ def handle_deterministic_workflow(user_prompt):
     return None
 
 
+def _log(msg: str, level: int = logging.INFO) -> None:
+    """
+    Record one agent-loop event both ways: into the in-session debug panel
+    (unchanged UI behavior, session-local, lost on restart) and into the
+    persistent log file via the module logger (survives restarts/crashes,
+    the same across every session, is what `tail -f logs/parora.log` or
+    `docker logs` actually shows).
+    """
+    st.session_state.debug_logs.append(msg)
+    log.log(level, msg)
+
+
 def run_agent(user_prompt: str) -> str:
     """
     Execute a gated, deduplicated multi-turn tool-calling loop for one user command.
@@ -5029,7 +5071,7 @@ def run_agent(user_prompt: str) -> str:
     Returns:
         Final agent text summary or a concatenation of tool result strings.
     """
-    st.session_state.debug_logs.append(f"📨 User: {user_prompt}")
+    _log(f"📨 User: {user_prompt}")
 
     prompt_lower = user_prompt.lower()
 
@@ -5127,7 +5169,7 @@ def run_agent(user_prompt: str) -> str:
     ]
 
     active_tools, tools_are_subset = _route_tools(prompt_lower)
-    st.session_state.debug_logs.append(
+    _log(
         f"🧰 {len(active_tools)}/{len(TOOLS)} tool schemas sent")
 
     # Gate: destructive tools only when user explicitly asked for hiding
@@ -5195,11 +5237,12 @@ def run_agent(user_prompt: str) -> str:
             )
         except ConnectionError:
             err = f"Cannot reach Ollama at {OLLAMA_HOST}. Start Ollama with `ollama serve`."
-            st.session_state.debug_logs.append(f"❌ {err}")
+            _log(f"❌ {err}", logging.ERROR)
             return err
         except Exception as e:
             err = f"Ollama error: {e}"
-            st.session_state.debug_logs.append(f"❌ {err}")
+            _log(f"❌ {err}", logging.ERROR)
+            log.exception("Unhandled error calling Ollama")
             return err
 
         msg = response.get("message", {})
@@ -5212,12 +5255,12 @@ def run_agent(user_prompt: str) -> str:
         if not tool_calls:
             final_text = msg.get("content", "").strip()
             if tools_are_subset and not summary_parts:
-                st.session_state.debug_logs.append(
+                _log(
                     "↻ No tool chosen from the routed subset — retrying with all "
                     f"{len(TOOLS)} schemas")
                 active_tools, tools_are_subset = TOOLS, False
                 continue
-            st.session_state.debug_logs.append(f"💬 Agent: {final_text}")
+            _log(f"💬 Agent: {final_text}")
             return final_text or ("Done: " + "; ".join(summary_parts))
 
         tool_results = []
@@ -5245,7 +5288,7 @@ def run_agent(user_prompt: str) -> str:
                 )
                 if chain_match:
                     args["chain"] = chain_match.group(1).upper()
-                    st.session_state.debug_logs.append(
+                    _log(
                         f"🧭 Injected explicit salt-bridge chain scope: "
                         f"{args['chain']}"
                     )
@@ -5254,7 +5297,7 @@ def run_agent(user_prompt: str) -> str:
             # Block select when: show-only intent, a show already fired this run,
             # or a rep-type show is in the same batch.
             if name == "select" and (show_only_intent or show_rep_fired or batch_has_rep_show):
-                st.session_state.debug_logs.append(
+                _log(
                     f"🚫 Blocked 'select' — representation command; no highlight needed"
                 )
                 tool_results.append({"tool": name, "result": "Blocked — use 'show' for representations, 'select' for highlights."})
@@ -5262,13 +5305,13 @@ def run_agent(user_prompt: str) -> str:
 
             # ── Gate: destructive ───────────────────────────────────────────
             if name in DESTRUCTIVE_TOOLS and not hide_requested:
-                st.session_state.debug_logs.append(f"🚫 Blocked '{name}' — not requested")
+                _log(f"🚫 Blocked '{name}' — not requested")
                 tool_results.append({"tool": name, "result": "Blocked — user did not request hiding."})
                 continue
 
             # ── Gate: load/search ───────────────────────────────────────────
             if name in LOAD_TOOLS and not load_requested:
-                st.session_state.debug_logs.append(
+                _log(
                     f"🚫 Blocked '{name}' — analysis of what is already loaded, not a new search")
                 f = st.session_state.focus
                 tool_results.append({"tool": name, "result": (
@@ -5280,14 +5323,14 @@ def run_agent(user_prompt: str) -> str:
 
             # ── Gate: write/side-effect ─────────────────────────────────────
             if name in WRITE_TOOLS and not write_requested:
-                st.session_state.debug_logs.append(f"🚫 Blocked '{name}' — not requested by user")
+                _log(f"🚫 Blocked '{name}' — not requested by user")
                 tool_results.append({"tool": name, "result": "Blocked — user did not request this operation."})
                 continue
 
             # ── Dedup: exact same call ──────────────────────────────────────
             sig = f"{name}:{json.dumps(args, sort_keys=True)}"
             if sig in called_sigs:
-                st.session_state.debug_logs.append(f"⏭ Skipped duplicate: {name}")
+                _log(f"⏭ Skipped duplicate: {name}")
                 tool_results.append({"tool": name, "result": "Already called — skipped."})
                 continue
 
@@ -5295,7 +5338,7 @@ def run_agent(user_prompt: str) -> str:
             if name == "show" and args.get("rep_type", "") == "ball+stick":
                 ngl_candidate = resolve_selection(args.get("selection", ""))
                 if ngl_candidate in selected_ngl_strs:
-                    st.session_state.debug_logs.append(f"⏭ Skipped 'show ball+stick' — already highlighted")
+                    _log(f"⏭ Skipped 'show ball+stick' — already highlighted")
                     tool_results.append({"tool": name, "result": "Already highlighted by select — skipped."})
                     continue
 
@@ -5303,7 +5346,7 @@ def run_agent(user_prompt: str) -> str:
             if name == "select":
                 ngl_candidate = resolve_selection(args.get("expression", ""))
                 if ngl_candidate in selected_ngl_strs:
-                    st.session_state.debug_logs.append(f"⏭ Skipped duplicate select — '{ngl_candidate}' already selected")
+                    _log(f"⏭ Skipped duplicate select — '{ngl_candidate}' already selected")
                     tool_results.append({"tool": name, "result": "Already selected — skipped."})
                     continue
 
@@ -5311,10 +5354,20 @@ def run_agent(user_prompt: str) -> str:
 
             # Dispatch to the tool function
             dispatch = TOOL_DISPATCH.get(name)
+            if not dispatch:
+                _log(f"❓ Unknown tool requested: {name}", logging.WARNING)
+            t0 = time.monotonic()
             try:
                 result = dispatch(args) if dispatch else f"Unknown tool: {name}"
             except Exception as e:
                 result = f"Tool error: {e}"
+                # The user only ever sees the one-line "Tool error: ..." string
+                # above; the full traceback -- what actually broke inside the
+                # tool -- only ever lands here, in the log.
+                log.exception("Tool '%s' raised with args=%s", name, args)
+            elapsed_ms = (time.monotonic() - t0) * 1000
+            if elapsed_ms > 2000:
+                log.warning("Tool '%s' took %.0f ms", name, elapsed_ms)
 
             # Track NGL strings that now have a ball+stick highlight
             if name == "select" and "error" not in result.lower():
@@ -5326,7 +5379,8 @@ def run_agent(user_prompt: str) -> str:
             if name == "show" and args.get("rep_type", "cartoon") != "ball+stick":
                 show_rep_fired = True
 
-            st.session_state.debug_logs.append(f"🔧 {name}({args}) → {result}")
+            level = logging.ERROR if str(result).lower().startswith(("error", "tool error")) else logging.INFO
+            _log(f"🔧 {name}({args}) → {result}", level)
             summary_parts.append(f"{name}: {result}")
             tool_results.append({"tool": name, "result": result})
 
@@ -5339,7 +5393,7 @@ def run_agent(user_prompt: str) -> str:
         ]
         if terminal_results:
             terminal_names = ", ".join(item["tool"] for item in terminal_results)
-            st.session_state.debug_logs.append(
+            _log(
                 f"🛑 Terminal tool completed ({terminal_names}) — ending agent loop"
             )
             return "Done: " + "; ".join(summary_parts)
@@ -5355,7 +5409,7 @@ def run_agent(user_prompt: str) -> str:
                 and tool_results[0]["tool"] in SELF_SUFFICIENT):
             only = tool_results[0]["result"]
             if not only.lower().startswith(("error", "blocked", "tool error")):
-                st.session_state.debug_logs.append(
+                _log(
                     f"⏎ Returned {tool_results[0]['tool']} directly — no summary turn")
                 return only
 
@@ -5381,7 +5435,7 @@ def run_agent(user_prompt: str) -> str:
             "content": f"Tool results:\n{results_text}\n\n{_state_block()}\n\n{follow_up}"
         })
 
-    st.session_state.debug_logs.append("⚠️ Max turns reached")
+    _log("⚠️ Max turns reached", logging.WARNING)
     return "Done: " + "; ".join(summary_parts)
 
 

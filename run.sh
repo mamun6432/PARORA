@@ -97,5 +97,6 @@ fi
 
 # ── 5. Run the full agent ──────────────────────────────────────────────────────
 cd protein-viz-agent
-mkdir -p structures membranes prepared
+mkdir -p structures membranes prepared logs
+echo "Logs: protein-viz-agent/logs/parora.log (tail -f it in another terminal to watch live)"
 exec "$ENV_PREFIX/bin/streamlit" run app.py --server.headless=true

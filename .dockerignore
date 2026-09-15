@@ -6,3 +6,4 @@ protein-viz-agent/structures/*
 !protein-viz-agent/structures/.gitkeep
 protein-viz-agent/membranes/
 protein-viz-agent/prepared/
+protein-viz-agent/logs/

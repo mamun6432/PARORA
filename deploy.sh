@@ -4,7 +4,7 @@ set -e
 
 # Run from project root so the Dockerfile can access both protein-viz-agent/ and logo/
 cd "$(dirname "$0")"
-mkdir -p protein-viz-agent/structures protein-viz-agent/membranes protein-viz-agent/prepared
+mkdir -p protein-viz-agent/structures protein-viz-agent/membranes protein-viz-agent/prepared protein-viz-agent/logs
 
 docker rm -f $(docker ps -a -q --filter ancestor=parora) 2>/dev/null || true
 docker rmi -f parora 2>/dev/null || true
@@ -14,4 +14,5 @@ docker run -p 8501:8501 \
   -v "$(pwd)/protein-viz-agent/structures:/app/structures" \
   -v "$(pwd)/protein-viz-agent/membranes:/app/membranes" \
   -v "$(pwd)/protein-viz-agent/prepared:/app/prepared" \
+  -v "$(pwd)/protein-viz-agent/logs:/app/logs" \
   parora
