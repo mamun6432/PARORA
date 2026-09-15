@@ -8,11 +8,31 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY protein-viz-agent/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY protein-viz-agent/server.py .
-COPY protein-viz-agent/templates/ ./templates/
+# Full-featured Streamlit agent (app.py) and every local module it imports
+# unconditionally. Note: PyMOL ray tracing (pymol_render.py/pymol_worker.py)
+# and the AmberTools-backed tools (membrane build, hydrogen prep, simulation,
+# QM/QM-MM) stay optional -- they shell out to a PyMOL/AmberTools conda env
+# discovered at runtime (PYMOL_PYTHON / PACKMOL_MEMGEN / AMBERHOME), which
+# this image does not bundle. Everything else works out of the box.
+COPY protein-viz-agent/app.py .
+COPY protein-viz-agent/analysis_tools.py .
+COPY protein-viz-agent/sequence_utils.py .
+COPY protein-viz-agent/structure_report.py .
+COPY protein-viz-agent/interactions.py .
+COPY protein-viz-agent/measure.py .
+COPY protein-viz-agent/superpose.py .
+COPY protein-viz-agent/prepare.py .
+COPY protein-viz-agent/oniom.py .
+COPY protein-viz-agent/quantum.py .
+COPY protein-viz-agent/simulation.py .
+COPY protein-viz-agent/membrane.py .
+COPY protein-viz-agent/Protein_accession.py .
+COPY protein-viz-agent/pymol_render.py .
+COPY protein-viz-agent/pymol_worker.py .
+COPY protein-viz-agent/viewer_component/ ./viewer_component/
 COPY logo/ ./logo/
-RUN mkdir -p /app/structures
+RUN mkdir -p /app/structures /app/membranes /app/prepared
 
-EXPOSE 8000
+EXPOSE 8501
 
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0", "--server.port=8501", "--server.headless=true"]

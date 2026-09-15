@@ -1,0 +1,8 @@
+.git
+**/__pycache__
+**/*.py[cod]
+.DS_Store
+protein-viz-agent/structures/*
+!protein-viz-agent/structures/.gitkeep
+protein-viz-agent/membranes/
+protein-viz-agent/prepared/
